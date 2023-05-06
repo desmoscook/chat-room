@@ -10,7 +10,9 @@
 #define MAX_CLNT 256
 
 pthread_mutex_t mutx;
-int clnt_cnt = 0;
+//用于记录当前连接的clnt的数量
+int clnt_cnt = 0; 
+//使用clnt_socks[]数组保存已经连接的clnt_sock
 int clnt_socks[MAX_CLNT];
 void error_handling(char * msg);
 void * handle_clnt(void * arg);
@@ -49,11 +51,13 @@ int main(int argc, char * argv[]) {
         if (clnt_sock == -1) 
             error_handling("accept() error");
 
+        //修改clnt_socks[]时，使用互斥锁上锁，防止同时多个连接导致同时修改出现错误
         pthread_mutex_lock(&mutx);
-        clnt_socks[clnt_cnt++] = clnt_sock; //把新的连接记录
+        clnt_socks[clnt_cnt++] = clnt_sock;
         pthread_mutex_unlock(&mutx);
 
-        pthread_create(&t_id, NULL, handle_clnt, (void *)&clnt_sock); //创建新的线程处理新链接
+        //创建新的线程处理新链接
+        pthread_create(&t_id, NULL, handle_clnt, (void *)&clnt_sock);
         pthread_detach(t_id); //引导线程销毁，不阻塞
         printf("connect..\n");
     }
@@ -71,7 +75,8 @@ void * handle_clnt(void * arg) {
 
     while ((str_len = read(clnt_sock, msg, sizeof(msg))) != 0)
         send_msg(msg, str_len);
-    //把clnt_sock的记录清除
+
+    //清除断开连接的clnt_sock，需要加锁
     pthread_mutex_lock(&mutx);
     for (int i = 0; i < clnt_cnt; i++) {
         if (clnt_socks[i] == clnt_sock) {
@@ -82,10 +87,11 @@ void * handle_clnt(void * arg) {
     }
     clnt_cnt--;
     pthread_mutex_unlock(&mutx);
+
     close(clnt_sock);
 }
 
-//给所有连接的sock发送这个信息
+//用send_msg给所有clnt发送消息
 void send_msg(char * msg, int len) {
     int i;
     pthread_mutex_lock(&mutx);
@@ -94,6 +100,7 @@ void send_msg(char * msg, int len) {
     pthread_mutex_unlock(&mutx);
 }
 
+//用于处理错误信息
 void error_handling(char * message) {
     fputs(message, stderr);
     fputc('\n', stderr);

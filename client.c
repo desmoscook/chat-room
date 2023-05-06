@@ -40,6 +40,7 @@ int main(int argc, char * argv[]) {
         error_handling("connect() error");
     printf("connect");
 
+    //创建两个线程来处理消息，一个用来发送，一个用来接受
     pthread_create(&snd_thread, NULL, send_msg, (void *)&sock);
     pthread_create(&rcv_thread, NULL, recv_msg, (void *)&sock);
     pthread_join(snd_thread, &thread_return);
