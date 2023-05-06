@@ -38,7 +38,6 @@ int main(int argc, char * argv[]) {
 
     if (connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) 
         error_handling("connect() error");
-    printf("connect");
 
     //创建两个线程来处理消息，一个用来发送，一个用来接受
     pthread_create(&snd_thread, NULL, send_msg, (void *)&sock);
@@ -52,6 +51,9 @@ int main(int argc, char * argv[]) {
 void *send_msg(void *arg) {
     int sock = *((int *)arg);
     char name_msg[NAME_SIZE + BUF_SIZE];
+
+    //发送name告知聊天室自己何时加入和离开
+    write(sock, name, strlen(name));
 
     while (1) {
         fgets(msg, BUF_SIZE, stdin);

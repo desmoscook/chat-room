@@ -8,6 +8,7 @@
 
 #define BUF_SIZE 100
 #define MAX_CLNT 256
+#define NAME_SIZE 20
 
 pthread_mutex_t mutx;
 //用于记录当前连接的clnt的数量
@@ -59,7 +60,6 @@ int main(int argc, char * argv[]) {
         //创建新的线程处理新链接
         pthread_create(&t_id, NULL, handle_clnt, (void *)&clnt_sock);
         pthread_detach(t_id); //引导线程销毁，不阻塞
-        printf("connect..\n");
     }
 
     close(serv_sock);
@@ -71,10 +71,17 @@ void * handle_clnt(void * arg) {
     int str_len = 0, i;
     char msg[BUF_SIZE];
 
-    //TODO 加入欢迎和退出公示
+    //接受该客户端的名称，在其加入及离开时显示到聊天室
+    char name[NAME_SIZE];
+    str_len = read(clnt_sock, name, sizeof(name));
+    sprintf(msg, "welcome %s join the chatRoom\n", name);
+    send_msg(msg, strlen(msg));
 
     while ((str_len = read(clnt_sock, msg, sizeof(msg))) != 0)
         send_msg(msg, str_len);
+
+    sprintf(msg, "%s leave the chatRoom\n", name);
+    send_msg(msg, strlen(msg));
 
     //清除断开连接的clnt_sock，需要加锁
     pthread_mutex_lock(&mutx);
