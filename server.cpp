@@ -1,16 +1,16 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include <pthread.h>
+#include <thread>
+#include <mutex>
 
 #define BUF_SIZE 100
 #define MAX_CLNT 256
 #define NAME_SIZE 20
 
-pthread_mutex_t mutx;
+std::mutex mutx;
 //用于记录当前连接的clnt的数量
 int clnt_cnt = 0; 
 //使用clnt_socks[]数组保存已经连接的clnt_sock
@@ -23,15 +23,13 @@ void send_msg(char * msg, int len);
 int main(int argc, char * argv[]) {
     int serv_sock, clnt_sock;
     struct sockaddr_in serv_adr, clnt_adr;
-    int clnt_adr_sz;
+    socklen_t clnt_adr_sz;
     pthread_t t_id;
 
     if (argc != 2) {
         printf("Usgae : %s <port> \n", argv[0]);
         exit(1);
     }
-
-    pthread_mutex_init(&mutx, NULL);
     
     serv_sock = socket(PF_INET, SOCK_STREAM, 0);
 
@@ -53,13 +51,13 @@ int main(int argc, char * argv[]) {
             error_handling("accept() error");
 
         //修改clnt_socks[]时，使用互斥锁上锁，防止同时多个连接导致同时修改出现错误
-        pthread_mutex_lock(&mutx);
+        mutx.lock();
         clnt_socks[clnt_cnt++] = clnt_sock;
-        pthread_mutex_unlock(&mutx);
+        mutx.unlock();
 
-        //创建新的线程处理新链接
-        pthread_create(&t_id, NULL, handle_clnt, (void *)&clnt_sock);
-        pthread_detach(t_id); //引导线程销毁，不阻塞
+        // 创建新的线程处理新链接,并引导线程销毁。
+        // 如果对线程还会有其他操作，则不应使用匿名的线程
+        std::thread(handle_clnt, (void *)&clnt_sock).detach();
     }
 
     close(serv_sock);
@@ -84,7 +82,7 @@ void * handle_clnt(void * arg) {
     send_msg(msg, strlen(msg));
 
     //清除断开连接的clnt_sock，需要加锁
-    pthread_mutex_lock(&mutx);
+    mutx.lock();
     for (int i = 0; i < clnt_cnt; i++) {
         if (clnt_socks[i] == clnt_sock) {
             while (i++ < clnt_cnt - 1)
@@ -93,7 +91,7 @@ void * handle_clnt(void * arg) {
         }
     }
     clnt_cnt--;
-    pthread_mutex_unlock(&mutx);
+    mutx.unlock();
 
     close(clnt_sock);
 }
@@ -101,10 +99,10 @@ void * handle_clnt(void * arg) {
 //用send_msg给所有clnt发送消息
 void send_msg(char * msg, int len) {
     int i;
-    pthread_mutex_lock(&mutx);
+    mutx.lock();
     for (int i = 0; i < clnt_cnt; i++)
         write(clnt_socks[i], msg, len);
-    pthread_mutex_unlock(&mutx);
+    mutx.unlock();
 }
 
 //用于处理错误信息

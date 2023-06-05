@@ -1,10 +1,9 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
 #include <unistd.h> 
 #include <string.h> 
 #include <arpa/inet.h> 
 #include <sys/socket.h> 
-#include <pthread.h>
+#include <thread>
 
 #define BUF_SIZE 100 
 #define NAME_SIZE 20
@@ -18,8 +17,6 @@ char msg[BUF_SIZE];
 int main(int argc, char * argv[]) {
     int sock;
     struct sockaddr_in serv_addr;
-    pthread_t snd_thread, rcv_thread;
-    void * thread_return;
     
     if (argc != 4) {
         printf("Usage : %s <ip> <port> <name>\n", argv[0]);
@@ -40,10 +37,11 @@ int main(int argc, char * argv[]) {
         error_handling("connect() error");
 
     //创建两个线程来处理消息，一个用来发送，一个用来接受
-    pthread_create(&snd_thread, NULL, send_msg, (void *)&sock);
-    pthread_create(&rcv_thread, NULL, recv_msg, (void *)&sock);
-    pthread_join(snd_thread, &thread_return);
-    pthread_join(rcv_thread, &thread_return);
+    std::thread snd_thread(send_msg, (void *)&sock);
+    std::thread rcv_thread(recv_msg, (void *)&sock);
+    snd_thread.join();
+    rcv_thread.join();
+
     close(sock);
     return 0;
 }
